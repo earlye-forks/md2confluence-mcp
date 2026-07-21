@@ -17,12 +17,23 @@
 
 ## Features
 
-- ✅ **Mermaid diagrams** → PNG (auto-converted via kroki.io)
+- ✅ **Mermaid diagrams** → PNG (rendered locally via `@mermaid-js/mermaid-cli`)
 - ✅ **Code blocks** → Confluence Code macro
 - ✅ **Images** → Attachments (auto-uploaded)
 - ✅ **Tables, links, formatting** → Preserved
 
 ## Installation
+
+This fork reads the Confluence API token from the `pass` password store
+instead of a plaintext env var (see [Get API Token](#get-api-token)), so it
+needs to be built and run from source rather than via `npx md2confluence-mcp`.
+
+```bash
+git clone <this fork's URL>
+cd md2confluence-mcp
+npm install
+npm run build
+```
 
 ### Claude Code
 
@@ -32,12 +43,11 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
 {
   "mcpServers": {
     "confluence": {
-      "command": "npx",
-      "args": ["-y", "md2confluence-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/md2confluence-mcp/dist/index.js"],
       "env": {
         "CONFLUENCE_URL": "https://your-domain.atlassian.net/wiki",
-        "CONFLUENCE_EMAIL": "your@email.com",
-        "CONFLUENCE_TOKEN": "YOUR_API_TOKEN"
+        "CONFLUENCE_EMAIL": "your@email.com"
       }
     }
   }
@@ -52,12 +62,11 @@ Add to your project's `.mcp.json`:
 {
   "mcpServers": {
     "confluence": {
-      "command": "npx",
-      "args": ["-y", "md2confluence-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/md2confluence-mcp/dist/index.js"],
       "env": {
         "CONFLUENCE_URL": "https://your-domain.atlassian.net/wiki",
-        "CONFLUENCE_EMAIL": "your@email.com",
-        "CONFLUENCE_TOKEN": "YOUR_API_TOKEN"
+        "CONFLUENCE_EMAIL": "your@email.com"
       }
     }
   }
@@ -68,7 +77,11 @@ Add to your project's `.mcp.json`:
 
 1. Go to https://id.atlassian.com/manage/api-tokens
 2. Click "Create API token"
-3. Copy the token to `CONFLUENCE_TOKEN`
+3. Store it in `pass` (recommended): `pass insert confluence/api-token`
+   - Use a different entry name by setting `CONFLUENCE_TOKEN_PASS_ENTRY`
+4. Alternatively, set the `CONFLUENCE_TOKEN` env var directly (fallback,
+   e.g. for CI/non-interactive setups) — note this leaves the token in
+   plaintext in your MCP server config
 
 ## Usage
 
@@ -158,14 +171,14 @@ https://company.atlassian.net/wiki/spaces/~712020.../overview
 ```mermaid
 flowchart LR
     A["Markdown"] --> B["Parse"]
-    B --> C["Mermaid → kroki.io → PNG"]
+    B --> C["Mermaid → mmdc (local) → PNG"]
     C --> D["Convert to Confluence HTML"]
     D --> E["Upload via REST API"]
     E --> F["Attach images"]
 ```
 
 1. **Parse** - Extract content, remove front matter
-2. **Render** - Convert Mermaid diagrams to PNG via [kroki.io](https://kroki.io)
+2. **Render** - Convert Mermaid diagrams to PNG locally via [`mmdc`](https://github.com/mermaid-js/mermaid-cli) (run through `npx`; the first render downloads a headless Chromium and may take a while)
 3. **Convert** - Transform Markdown to Confluence storage format
 4. **Upload** - Create/update page via Confluence REST API
 5. **Attach** - Upload images as page attachments
@@ -176,7 +189,8 @@ flowchart LR
 |----------|----------|-------------|
 | `CONFLUENCE_URL` | ✅ | e.g., `https://your-domain.atlassian.net/wiki` |
 | `CONFLUENCE_EMAIL` | ✅ | Your Atlassian account email |
-| `CONFLUENCE_TOKEN` | ✅ | API token |
+| `CONFLUENCE_TOKEN` | Fallback | API token (prefer storing it in `pass` instead, see [Get API Token](#get-api-token)) |
+| `CONFLUENCE_TOKEN_PASS_ENTRY` | | `pass` entry name for the API token (default: `confluence/api-token`) |
 
 ## Development
 
@@ -192,7 +206,7 @@ npm install
 npm run build
 
 # Test locally
-CONFLUENCE_URL=... CONFLUENCE_EMAIL=... CONFLUENCE_TOKEN=... npm start
+CONFLUENCE_URL=... CONFLUENCE_EMAIL=... npm start
 ```
 
 ## License
@@ -201,6 +215,6 @@ MIT
 
 ## Credits
 
-- [kroki.io](https://kroki.io) - Diagram rendering API
+- [mermaid-cli](https://github.com/mermaid-js/mermaid-cli) - Local diagram rendering
 - [Model Context Protocol](https://modelcontextprotocol.io) - MCP SDK
 - [Confluence REST API](https://developer.atlassian.com/cloud/confluence/rest/)

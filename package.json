@@ -11,6 +11,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "test": "npm run build && cd dist && node --test",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
