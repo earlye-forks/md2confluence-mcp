@@ -1,3 +1,5 @@
 src/
 tsconfig.json
 .gitignore
+dist/**/*.test.js
+dist/**/*.test.d.ts
