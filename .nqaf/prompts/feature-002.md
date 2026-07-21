@@ -1,4 +1,4 @@
-# Fix: read CONFLUENCE_URL/CONFLUENCE_EMAIL from `pass`, add a one-time setup wizard
+# Fix: read CONFLUENCE_URL/CONFLUENCE_EMAIL from `pass`, add a one-time setup wizard that also registers the server with Claude Code
 
 This prompt depends on `feature-001.md` having already run — it assumes
 `src/config.ts` exports `resolveConfluenceToken` following the
@@ -92,6 +92,11 @@ in a real terminal — not auto-triggered by the MCP server:
      setup) — never build a shell string.
   6. Print a final summary of which entries were created vs. already
      present.
+  7. Register this server with Claude Code (see Problem 3/Fix 3 below) —
+     this step always runs, even when step 3 skipped the `pass` prompts
+     because all three entries already existed. Registration has no
+     interactive prompt of its own, so there's no reason to gate it behind
+     "first run only."
 - In `index.ts`'s `validateConfig()`, when any of the three resolved values
   is empty, add a line pointing the user at `npm run setup` (or
   `node dist/setup.js` if installed as a dependency) as the guided fix,
@@ -106,13 +111,71 @@ in a real terminal — not auto-triggered by the MCP server:
   plaintext env vars as a supported fallback in the table, just not in the
   "recommended" example).
 
+## Problem 3 — registering this server with Claude Code is still a manual, hand-edited step
+
+Even once `pass` is populated, getting Claude Code to actually launch this
+server means hand-editing a config file and typing an absolute path to
+`dist/index.js` (see README "Installation"). There's no command that
+registers it for you.
+
+## Fix 3
+
+Have `setup.ts` (step 7 above) register the server **globally** (available
+in every project, not just one repo checkout) using Claude Code's own CLI —
+`claude mcp add` — rather than hand-editing any Claude Code config file
+directly:
+
+- Check `claude` is on `$PATH` the same way step 1 checks for `pass`
+  (`execFile("which", ["claude"])` or catch ENOENT). If missing, print a
+  one-line note that MCP registration was skipped and exit that step
+  successfully anyway — this machine may not have Claude Code's CLI
+  installed at all, and that shouldn't fail the `pass` setup that already
+  ran.
+- Run:
+  ```
+  claude mcp add confluence --scope user -- npm --prefix <repoRoot> run start
+  ```
+  via `execFile`, args passed as an array (never a shell string), where
+  `repoRoot = process.cwd()` (this script is always invoked from the
+  package root via `npm run setup`). `--scope user` is what makes this
+  global — Claude Code exposes it in every project's sessions, not just
+  this repo's. Using `npm --prefix <repoRoot> run start` as the command
+  (rather than `node <repoRoot>/dist/index.js` directly) means Claude Code
+  launches it via the same `"start": "node dist/index.js"` script already
+  in `package.json`, and it needs no `env` block — `pass` resolution
+  already covers all three credentials.
+- **Verify by reading back, don't trust the command's stdout.** In one
+  sandboxed test run, `claude mcp add` printed
+  `Added stdio MCP server ... File modified: ~/.claude.json` and still
+  exited non-zero because the write was rejected by the sandbox — the
+  server was never actually registered (confirmed via `claude mcp get`
+  afterward). So after running `add`, shell out to `claude mcp get confluence`
+  and only report success if that lookup actually finds the entry; if `add`
+  exits non-zero, or `get` doesn't find it afterward, print a one-line
+  warning (recommend running `claude mcp add confluence --scope user --
+  npm --prefix <repoRoot> run start` manually) rather than silently
+  claiming success.
+- This step is idempotent by construction — `claude mcp add` overwrites an
+  existing entry of the same name rather than erroring or duplicating it, so
+  re-running `npm run setup` (or step 7 alone) any number of times converges
+  on the same registration.
+- README: replace the manual `~/.claude/settings.json`/project-`.mcp.json`
+  JSON-editing instructions in "Installation" with "run `npm run setup`,
+  which registers this server with Claude Code globally (`claude mcp add
+  ... --scope user`)." Keep one manual snippet below it as a fallback for
+  anyone without the `claude` CLI on `$PATH`, or who wants project- or
+  local-scoped registration instead of global.
+
 ## Do not make other changes
 
 Leave `confluence.ts`, `converter.ts`, the tool list, and Mermaid rendering
 untouched. Don't change `resolveConfluenceToken`'s exported signature beyond
 factoring out the shared helper. Don't remove the plaintext env var fallback
 for any of the three variables — it's still the documented, supported path
-for CI/non-interactive setups.
+for CI/non-interactive setups. Don't hand-parse or hand-write any Claude
+Code config file (`~/.claude.json` or otherwise) directly — always go
+through the `claude mcp` CLI, since that file's internal shape is not a
+documented, stable public format.
 
 ## Integration tests
 
@@ -128,6 +191,8 @@ for CI/non-interactive setups.
     prove it).
   - Same two tests for `resolveConfluenceEmail`.
 - Do not add an automated test that drives `setup.ts`'s interactive
-  readline prompts or mutates the real default `pass` entries — that's
-  exactly the human-in-the-loop path Fix 2 exists for. It's fine to leave
-  `setup.ts` untested by `node:test`; a manual smoke run is enough.
+  readline prompts, mutates the real default `pass` entries, or calls the
+  real `claude mcp add`/registers against the real global Claude Code
+  config — that's exactly the human-in-the-loop, machine-specific path
+  Fix 2/Fix 3 exist for. It's fine to leave `setup.ts` untested by
+  `node:test`; a manual smoke run is enough.

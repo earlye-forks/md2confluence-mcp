@@ -59,6 +59,62 @@ async function passInsert(entry: string, value: string): Promise<void> {
   });
 }
 
+async function claudeIsAvailable(): Promise<boolean> {
+  try {
+    await execFileAsync("which", ["claude"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function manualRegisterHint(repoRoot: string): string {
+  return `  claude mcp add confluence --scope user -- npm --prefix ${repoRoot} run start`;
+}
+
+async function registerWithClaudeCode(): Promise<void> {
+  console.log("");
+
+  if (!(await claudeIsAvailable())) {
+    console.log("`claude` CLI not found on $PATH — skipping Claude Code MCP registration.");
+    return;
+  }
+
+  const repoRoot = process.cwd();
+
+  try {
+    await execFileAsync("claude", [
+      "mcp",
+      "add",
+      "confluence",
+      "--scope",
+      "user",
+      "--",
+      "npm",
+      "--prefix",
+      repoRoot,
+      "run",
+      "start",
+    ]);
+  } catch {
+    console.log("⚠️  `claude mcp add` failed. Register manually with:");
+    console.log(manualRegisterHint(repoRoot));
+    return;
+  }
+
+  // `claude mcp add` can report success and still not have actually
+  // written the registration (e.g. a sandboxed config write that's
+  // silently rejected), so verify by reading it back rather than
+  // trusting the command's exit/stdout.
+  try {
+    await execFileAsync("claude", ["mcp", "get", "confluence"]);
+    console.log("Registered `confluence` MCP server with Claude Code (scope: user).");
+  } catch {
+    console.log("⚠️  Could not verify registration via `claude mcp get confluence`. Register manually with:");
+    console.log(manualRegisterHint(repoRoot));
+  }
+}
+
 async function main() {
   if (!(await passIsAvailable())) {
     console.error("`pass` was not found on $PATH.");
@@ -82,34 +138,35 @@ async function main() {
     for (const spec of ENTRIES) {
       console.log(`  - ${spec.entry}`);
     }
-    process.exit(0);
-  }
+  } else {
+    console.log("Setting up md2confluence-mcp credentials in `pass`.");
+    console.log("");
 
-  console.log("Setting up md2confluence-mcp credentials in `pass`.");
-  console.log("");
+    const created: string[] = [];
 
-  const created: string[] = [];
-
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    for (const spec of missing) {
-      if (spec.hint) {
-        console.log(spec.hint);
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    try {
+      for (const spec of missing) {
+        if (spec.hint) {
+          console.log(spec.hint);
+        }
+        const value = await rl.question(spec.prompt);
+        await passInsert(spec.entry, value);
+        created.push(spec.entry);
       }
-      const value = await rl.question(spec.prompt);
-      await passInsert(spec.entry, value);
-      created.push(spec.entry);
+    } finally {
+      rl.close();
     }
-  } finally {
-    rl.close();
+
+    console.log("");
+    console.log("Setup complete:");
+    for (const spec of ENTRIES) {
+      const status = created.includes(spec.entry) ? "created" : "already present";
+      console.log(`  - ${spec.entry}: ${status}`);
+    }
   }
 
-  console.log("");
-  console.log("Setup complete:");
-  for (const spec of ENTRIES) {
-    const status = created.includes(spec.entry) ? "created" : "already present";
-    console.log(`  - ${spec.entry}: ${status}`);
-  }
+  await registerWithClaudeCode();
 }
 
 main().catch((error) => {

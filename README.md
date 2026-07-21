@@ -51,35 +51,24 @@ missing, and stores them. It's safe to re-run — if all three entries
 already exist, it just reports that and exits without prompting or
 overwriting anything.
 
+It then registers this server with Claude Code globally, via
+`claude mcp add confluence --scope user -- npm --prefix <repo> run start`,
+so it's available in every project, not just this repo. This step also runs
+even when all `pass` entries were already present. If the `claude` CLI
+isn't on your `$PATH`, registration is skipped with a note — the `pass`
+setup above still completes normally.
+
 ### Claude Code
 
-Add to your Claude Code settings (`~/.claude/settings.json`):
+Registration happens automatically as part of `npm run setup` above. If you
+don't have the `claude` CLI on `$PATH`, or want project- or local-scoped
+registration instead of global, register manually:
 
-```json
-{
-  "mcpServers": {
-    "confluence": {
-      "command": "node",
-      "args": ["/absolute/path/to/md2confluence-mcp/dist/index.js"]
-    }
-  }
-}
+```bash
+claude mcp add confluence --scope user -- npm --prefix /absolute/path/to/md2confluence-mcp run start
 ```
 
-### Project-specific
-
-Add to your project's `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "confluence": {
-      "command": "node",
-      "args": ["/absolute/path/to/md2confluence-mcp/dist/index.js"]
-    }
-  }
-}
-```
+(swap `--scope user` for `--scope project` or `--scope local` as needed)
 
 ## Get API Token
 
