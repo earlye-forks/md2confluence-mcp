@@ -1,11 +1,18 @@
 /**
  * Markdown to Confluence converter
  * - Converts Markdown to Confluence storage format
- * - Renders Mermaid diagrams to PNG via kroki.io
+ * - Renders Mermaid diagrams to PNG locally via @mermaid-js/mermaid-cli
  */
 
 import { marked } from "marked";
 import { createHash } from "crypto";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+
+const execFileAsync = promisify(execFile);
 
 interface Attachment {
   filename: string;
@@ -18,21 +25,34 @@ interface ConversionResult {
 }
 
 /**
- * Render Mermaid diagram to PNG using kroki.io
+ * Render Mermaid diagram to PNG locally using `mmdc` (mermaid-cli) via npx.
+ * Mermaid's parser mishandles a literal `#` immediately followed by digits
+ * inside note/label text (e.g. `#29380` in `Note over X: ...`); this is a
+ * pre-existing Mermaid limitation, not something to "fix" by escaping `#`.
  */
 async function renderMermaidToPng(code: string): Promise<Buffer> {
-  const response = await fetch("https://kroki.io/mermaid/png", {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: code,
-  });
+  const dir = await mkdtemp(join(tmpdir(), "mermaid-"));
+  const inputPath = join(dir, "diagram.mmd");
+  const outputPath = join(dir, "diagram.png");
 
-  if (!response.ok) {
-    throw new Error(`Kroki API error: ${response.status}`);
+  try {
+    await writeFile(inputPath, code, "utf-8");
+    await execFileAsync("npx", [
+      "-y",
+      "-p",
+      "@mermaid-js/mermaid-cli",
+      "mmdc",
+      "-i",
+      inputPath,
+      "-o",
+      outputPath,
+      "-b",
+      "white",
+    ]);
+    return await readFile(outputPath);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
-
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
 }
 
 /**
