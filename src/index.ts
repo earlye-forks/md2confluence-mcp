@@ -11,23 +11,33 @@ import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { ConfluenceClient } from "./confluence.js";
 import { convertMarkdownToConfluence } from "./converter.js";
-import { resolveConfluenceToken } from "./config.js";
+import {
+  resolveConfluenceToken,
+  resolveConfluenceUrl,
+  resolveConfluenceEmail,
+} from "./config.js";
 
 // Environment variables
-const CONFLUENCE_URL = process.env.CONFLUENCE_URL || "";
-const CONFLUENCE_EMAIL = process.env.CONFLUENCE_EMAIL || "";
+const CONFLUENCE_URL = await resolveConfluenceUrl();
+const CONFLUENCE_EMAIL = await resolveConfluenceEmail();
 const CONFLUENCE_TOKEN = await resolveConfluenceToken();
 
 // Validate config
 function validateConfig() {
   if (!CONFLUENCE_URL || !CONFLUENCE_EMAIL || !CONFLUENCE_TOKEN) {
     console.error("Missing required environment variables:");
-    console.error("  CONFLUENCE_URL - e.g., https://your-domain.atlassian.net/wiki");
-    console.error("  CONFLUENCE_EMAIL - your Atlassian email");
-    console.error("  CONFLUENCE_TOKEN - API token, resolved from the `pass` password store");
-    console.error("    entry named by CONFLUENCE_TOKEN_PASS_ENTRY (default: confluence/api-token),");
-    console.error("    or from the CONFLUENCE_TOKEN env var as a fallback.");
-    console.error("    Get a token at https://id.atlassian.com/manage/api-tokens");
+    console.error("  CONFLUENCE_URL - resolved from the `pass` password store entry named by");
+    console.error("    CONFLUENCE_URL_PASS_ENTRY (default: confluence/url), or from the");
+    console.error("    CONFLUENCE_URL env var as a fallback, e.g. https://your-domain.atlassian.net/wiki");
+    console.error("  CONFLUENCE_EMAIL - resolved from the `pass` password store entry named by");
+    console.error("    CONFLUENCE_EMAIL_PASS_ENTRY (default: confluence/email), or from the");
+    console.error("    CONFLUENCE_EMAIL env var as a fallback");
+    console.error("  CONFLUENCE_TOKEN - resolved from the `pass` password store entry named by");
+    console.error("    CONFLUENCE_TOKEN_PASS_ENTRY (default: confluence/api-token), or from the");
+    console.error("    CONFLUENCE_TOKEN env var as a fallback. Get a token at");
+    console.error("    https://id.atlassian.com/manage/api-tokens");
+    console.error("");
+    console.error("Run `npm run setup` (or `node dist/setup.js`) for a guided one-time setup.");
     process.exit(1);
   }
 }

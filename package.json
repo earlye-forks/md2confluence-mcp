@@ -5,12 +5,14 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "md2confluence-mcp": "dist/index.js"
+    "md2confluence-mcp": "dist/index.js",
+    "md2confluence-mcp-setup": "dist/setup.js"
   },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "setup": "npm run build && node dist/setup.js",
     "test": "npm run build && cd dist && node --test",
     "prepublishOnly": "npm run build"
   },
