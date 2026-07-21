@@ -24,9 +24,10 @@
 
 ## Installation
 
-This fork reads the Confluence API token from the `pass` password store
-instead of a plaintext env var (see [Get API Token](#get-api-token)), so it
-needs to be built and run from source rather than via `npx md2confluence-mcp`.
+This fork reads the Confluence URL, email, and API token from the `pass`
+password store instead of plaintext env vars (see [First-Time
+Setup](#first-time-setup)), so it needs to be built and run from source
+rather than via `npx md2confluence-mcp`.
 
 ```bash
 git clone <this fork's URL>
@@ -34,6 +35,21 @@ cd md2confluence-mcp
 npm install
 npm run build
 ```
+
+## First-Time Setup
+
+Run the guided setup wizard once to populate `pass` with your Confluence
+credentials:
+
+```bash
+npm run setup
+```
+
+This checks for `pass` on your `$PATH`, prompts only for whichever of
+`confluence/url`, `confluence/email`, and `confluence/api-token` entries are
+missing, and stores them. It's safe to re-run — if all three entries
+already exist, it just reports that and exits without prompting or
+overwriting anything.
 
 ### Claude Code
 
@@ -44,11 +60,7 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
   "mcpServers": {
     "confluence": {
       "command": "node",
-      "args": ["/absolute/path/to/md2confluence-mcp/dist/index.js"],
-      "env": {
-        "CONFLUENCE_URL": "https://your-domain.atlassian.net/wiki",
-        "CONFLUENCE_EMAIL": "your@email.com"
-      }
+      "args": ["/absolute/path/to/md2confluence-mcp/dist/index.js"]
     }
   }
 }
@@ -63,11 +75,7 @@ Add to your project's `.mcp.json`:
   "mcpServers": {
     "confluence": {
       "command": "node",
-      "args": ["/absolute/path/to/md2confluence-mcp/dist/index.js"],
-      "env": {
-        "CONFLUENCE_URL": "https://your-domain.atlassian.net/wiki",
-        "CONFLUENCE_EMAIL": "your@email.com"
-      }
+      "args": ["/absolute/path/to/md2confluence-mcp/dist/index.js"]
     }
   }
 }
@@ -78,6 +86,7 @@ Add to your project's `.mcp.json`:
 1. Go to https://id.atlassian.com/manage/api-tokens
 2. Click "Create API token"
 3. Store it in `pass` (recommended): `pass insert confluence/api-token`
+   - Or run `npm run setup` to be walked through this and the other entries
    - Use a different entry name by setting `CONFLUENCE_TOKEN_PASS_ENTRY`
 4. Alternatively, set the `CONFLUENCE_TOKEN` env var directly (fallback,
    e.g. for CI/non-interactive setups) — note this leaves the token in
@@ -187,8 +196,10 @@ flowchart LR
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `CONFLUENCE_URL` | ✅ | e.g., `https://your-domain.atlassian.net/wiki` |
-| `CONFLUENCE_EMAIL` | ✅ | Your Atlassian account email |
+| `CONFLUENCE_URL` | Fallback | e.g., `https://your-domain.atlassian.net/wiki` (prefer storing it in `pass` instead, see [First-Time Setup](#first-time-setup)) |
+| `CONFLUENCE_URL_PASS_ENTRY` | | `pass` entry name for the URL (default: `confluence/url`) |
+| `CONFLUENCE_EMAIL` | Fallback | Your Atlassian account email (prefer storing it in `pass` instead) |
+| `CONFLUENCE_EMAIL_PASS_ENTRY` | | `pass` entry name for the email (default: `confluence/email`) |
 | `CONFLUENCE_TOKEN` | Fallback | API token (prefer storing it in `pass` instead, see [Get API Token](#get-api-token)) |
 | `CONFLUENCE_TOKEN_PASS_ENTRY` | | `pass` entry name for the API token (default: `confluence/api-token`) |
 
